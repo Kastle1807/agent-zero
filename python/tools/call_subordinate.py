@@ -2,6 +2,12 @@ from agent import Agent, UserMessage
 from python.helpers.tool import Tool, Response
 
 
+DEFAULT_SUBORDINATE_SYSTEM_MESSAGE = (
+    "Start working on the assigned task immediately. "
+    "Only create additional agents if you need help or the work can be parallelized."
+)
+
+
 class Delegation(Tool):
 
     async def execute(self, message="", reset="", **kwargs):
@@ -20,7 +26,13 @@ class Delegation(Tool):
 
         # add user message to subordinate agent
         subordinate: Agent = self.agent.get_data(Agent.DATA_NAME_SUBORDINATE)
-        subordinate.hist_add_user_message(UserMessage(message=message, attachments=[]))
+        subordinate.hist_add_user_message(
+            UserMessage(
+                message=message,
+                attachments=[],
+                system_message=[DEFAULT_SUBORDINATE_SYSTEM_MESSAGE],
+            )
+        )
 
         # set subordinate prompt profile if provided, if not, keep original
         prompt_profile = kwargs.get("prompt_profile")

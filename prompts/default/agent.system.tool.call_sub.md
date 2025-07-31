@@ -4,6 +4,7 @@ you can use subordinates for subtasks
 subordinates can be scientist coder engineer etc
 message field: always describe role, task details goal overview for new subordinate
 delegate specific subtasks not entire task
+new subordinates must begin executing their task immediately and may only create further agents when they need help or when work can be parallelized
 reset arg usage:
   "true": spawn new subordinate
   "false": continue existing subordinate

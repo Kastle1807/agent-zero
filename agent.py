@@ -18,6 +18,7 @@ from langchain_core.prompts import (
     ChatPromptTemplate,
 )
 from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from python.deepconf.orchestrator import DeepConfOrchestrator
 
 import python.helpers.log as Log
 from python.helpers.dirty_json import DirtyJson
@@ -338,12 +339,25 @@ class Agent:
                             printer.stream(chunk)
                             await self.handle_response_stream(full)
 
-                        # call main LLM
-                        agent_response, _reasoning = await self.call_chat_model(
-                            messages=prompt,
-                            response_callback=stream_callback,
-                            reasoning_callback=reasoning_callback,
-                        )
+                        # call main LLM (DeepConf or fallback)
+                        messages_dict = []
+                        for m in prompt:
+                            if isinstance(m, SystemMessage):
+                                messages_dict.append({"role": "system", "content": m.content})
+                            elif isinstance(m, HumanMessage):
+                                messages_dict.append({"role": "user", "content": m.content})
+                            else:
+                                messages_dict.append({"role": "assistant", "content": getattr(m, "content", "")})
+
+                        final_answer, weights = await self.call_deepconf(messages_dict)
+                        if final_answer:
+                            agent_response = final_answer
+                        else:
+                            agent_response, _reasoning = await self.call_chat_model(
+                                messages=prompt,
+                                response_callback=stream_callback,
+                                reasoning_callback=reasoning_callback,
+                            )
 
                         await self.handle_intervention(agent_response)
 
@@ -657,6 +671,15 @@ class Agent:
         )
 
         return response, reasoning
+
+    async def call_deepconf(self, messages: list[dict]) -> tuple[str, dict]:
+        dc_cfg = (self.config.additional or {}).get("deepconf", {})
+        if not dc_cfg.get("enabled", True):
+            return "", {}
+        model = self.get_chat_model()
+        model_name = self.config.chat_model.name
+        orch = DeepConfOrchestrator(model, dc_cfg, model_name)
+        return await orch.run(messages)
 
     async def rate_limiter(
         self, model_config: models.ModelConfig, input: str, background: bool = False
